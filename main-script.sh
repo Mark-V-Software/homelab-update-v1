@@ -1,23 +1,22 @@
 #!/bin/bash
 
-# Check for root
+# 1. Strict Root Check
 if [ "$EUID" -ne 0 ]; then
-  echo "Root, please"
+  echo "Error: Please run this script with sudo or as root!"
   exit 1
 fi
 
-# Install package
-DEBIAN_FRONTEND=noninteractive apt install -y unattended-upgrades apt-listchanges
+# 2. Pre-create directories to prevent debconf prompts
+mkdir -p /etc/apt/apt.conf.d
+mkdir -p /etc/systemd/system/apt-daily-upgrade.timer.d/
 
-# Create folder because I don't want to transform system directory into a mess
-LOCAL_BACKUP_FOLDER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/backup"
-mkdir -pv "$LOCAL_BACKUP_FOLDER"
+# 3. Pre-configure 20auto-upgrades (This kills the blue interactive window)
+cat > /etc/apt/apt.conf.d/20auto-upgrades <<'EOF'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+EOF
 
-# Backup
-LOCAL_BACKUP_FILE="$LOCAL_BACKUP_FOLDER/50unattended-upgrades"
-cp -a /etc/apt/apt.conf.d/50unattended-upgrades "$LOCAL_BACKUP_FILE"
-
-# 50unattended-upgrades
+# 4. Configure 50unattended-upgrades
 cat > /etc/apt/apt.conf.d/50unattended-upgrades <<'EOF'
 Unattended-Upgrade::Origins-Pattern {
         // origin * means every repo
@@ -34,31 +33,31 @@ Unattended-Upgrade::Automatic-Reboot-WithUsers "false";
 Unattended-Upgrade::Automatic-Reboot-Time "now";
 EOF
 
-# 20auto-upgrades
-cat > /etc/apt/apt.conf.d/20auto-upgrades <<'EOF'
-APT::Periodic::Update-Package-Lists "1";
-APT::Periodic::Unattended-Upgrade "1";
-EOF
+# 5. Force total non-interactive mode for APT/DPKG
+export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
 
-# apt-daily-upgrade.timer.d
-mkdir -p /etc/systemd/system/apt-daily-upgrade.timer.d/
+# 6. Seed debconf database just in case
+echo "unattended-upgrades unattended-upgrades/enable_auto_updates boolean true" | debconf-set-selections
 
-cat << 'EOF' > /etc/systemd/system/apt-daily-upgrade.timer.d/override.conf
+# 7. Update and Install packages silently
+apt-get update
+apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" unattended-upgrades apt-listchanges
+
+# 8. Set systemd timer to midnight (00:00) with 0 delay
+cat > /etc/systemd/system/apt-daily-upgrade.timer.d/override.conf << 'EOF'
 [Timer]
 OnCalendar=
 OnCalendar=*-*-* 00:00:00
 RandomizedDelaySec=0
 EOF
 
-# Restart & Reload
+# 9. Reload systemd and enable timers
 systemctl daemon-reload
 systemctl restart apt-daily-upgrade.timer
-
 systemctl enable apt-daily.timer --now
 systemctl enable apt-daily-upgrade.timer --now
 
-# Tryout
+# 10. Verification and Dry-run
 unattended-upgrades --dry-run --debug
-
-# See Timer
 systemctl list-timers apt-daily-upgrade.timer
