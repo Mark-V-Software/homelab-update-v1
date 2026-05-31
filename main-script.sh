@@ -7,8 +7,9 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # Install package
+echo "unattended-upgrades unattended-upgrades/enable_auto_updates boolean true" | debconf-set-selections
 export DEBIAN_FRONTEND=noninteractive
-apt install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" unattended-upgrades apt-listchanges
+apt install -y unattended-upgrades apt-listchanges
 
 # Reconfigure
 dpkg-reconfigure -plow unattended-upgrades
