@@ -7,7 +7,8 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # Install package
-apt install -y unattended-upgrades apt-listchanges
+export DEBIAN_FRONTEND=noninteractive
+apt install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" unattended-upgrades apt-listchanges
 
 # Reconfigure
 dpkg-reconfigure -plow unattended-upgrades
