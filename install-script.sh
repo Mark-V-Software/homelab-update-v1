@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Check for root
 if [ "$EUID" -ne 0 ]; then
   echo "Root, please"
