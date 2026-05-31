@@ -7,12 +7,7 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # Install package
-echo "unattended-upgrades unattended-upgrades/enable_auto_updates boolean true" | debconf-set-selections
-export DEBIAN_FRONTEND=noninteractive
-apt install -y unattended-upgrades apt-listchanges
-
-# Reconfigure
-dpkg-reconfigure -plow unattended-upgrades
+DEBIAN_FRONTEND=noninteractive apt install -y unattended-upgrades apt-listchanges
 
 # Create folder because I don't want to transform system directory into a mess
 LOCAL_BACKUP_FOLDER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/backup"
